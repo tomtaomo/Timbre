@@ -4,7 +4,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -36,6 +41,22 @@ internal fun BookPlayView(
   onCurrentChapterClick: () -> Unit,
   snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+  // 进播放页自动开播，只触发一次。
+  //
+  // 用 rememberSaveable 而不是普通 remember，是为了同时挡住两件事：
+  //  - 从书签/设置等页面返回：同一个 NavEntry 的 saveable 状态还在，标记仍是 true，不会重播
+  //  - 进程被杀后系统恢复：标记从 savedInstanceState 恢复，同样不会突然出声
+  var autoPlayConsumed by rememberSaveable { mutableStateOf(false) }
+  LaunchedEffect(viewState.playing) {
+    if (!autoPlayConsumed) {
+      autoPlayConsumed = true
+      // 已经在播（比如后台正在放同一本书）就不要打断
+      if (!viewState.playing) {
+        onPlayClick()
+      }
+    }
+  }
+
   Scaffold(
     snackbarHost = {
       SnackbarHost(hostState = snackbarHostState)
@@ -59,10 +80,10 @@ internal fun BookPlayView(
         onPlayClick = onPlayClick,
         onRewindClick = onRewindClick,
         onFastForwardClick = onFastForwardClick,
+        onSeek = onSeek,
         onSleepTimerClick = onSleepTimerClick,
         onBookmarkClick = onBookmarkClick,
         onBookmarkLongClick = onBookmarkLongClick,
-        onSeek = onSeek,
         onSkipToNext = onSkipToNext,
         onSkipToPrevious = onSkipToPrevious,
         onCurrentChapterClick = onCurrentChapterClick,
