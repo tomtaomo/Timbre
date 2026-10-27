@@ -1,1 +1,21 @@
-F:\Users\Administrator\文档\deepseek-harness\default-workspace\timbre_patch\build-apk.yml
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/build_setup
+      - name: Build debug APK
+        run: ./gradlew :app:assembleFreeDebug
+      - uses: actions/upload-artifact@v6
+        with:
+          name: timbre-apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
