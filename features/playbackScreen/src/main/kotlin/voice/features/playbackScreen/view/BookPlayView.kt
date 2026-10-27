@@ -43,9 +43,6 @@ internal fun BookPlayView(
     topBar = {
       BookPlayAppBar(
         viewState = viewState,
-        onSleepTimerClick = onSleepTimerClick,
-        onBookmarkClick = onBookmarkClick,
-        onBookmarkLongClick = onBookmarkLongClick,
         onSpeedChangeClick = onSpeedChangeClick,
         onSkipSilenceClick = onSkipSilenceClick,
         onVolumeBoostClick = onVolumeBoostClick,
@@ -62,6 +59,9 @@ internal fun BookPlayView(
         onPlayClick = onPlayClick,
         onRewindClick = onRewindClick,
         onFastForwardClick = onFastForwardClick,
+        onSleepTimerClick = onSleepTimerClick,
+        onBookmarkClick = onBookmarkClick,
+        onBookmarkLongClick = onBookmarkLongClick,
         onSeek = onSeek,
         onSkipToNext = onSkipToNext,
         onSkipToPrevious = onSkipToPrevious,

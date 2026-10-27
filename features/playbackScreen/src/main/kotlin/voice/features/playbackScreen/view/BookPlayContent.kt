@@ -24,6 +24,9 @@ internal fun BookPlayContent(
   onPlayClick: () -> Unit,
   onRewindClick: () -> Unit,
   onFastForwardClick: () -> Unit,
+  onSleepTimerClick: () -> Unit,
+  onBookmarkClick: () -> Unit,
+  onBookmarkLongClick: () -> Unit,
   onSeek: (Duration) -> Unit,
   onSkipToNext: () -> Unit,
   onSkipToPrevious: () -> Unit,
@@ -69,6 +72,10 @@ internal fun BookPlayContent(
           onPlayClick = onPlayClick,
           onRewindClick = onRewindClick,
           onFastForwardClick = onFastForwardClick,
+          sleepTimerState = viewState.sleepTimerState,
+          onSleepTimerClick = onSleepTimerClick,
+          onBookmarkClick = onBookmarkClick,
+          onBookmarkLongClick = onBookmarkLongClick,
           loading = viewState.loading,
         )
       }
@@ -107,6 +114,10 @@ internal fun BookPlayContent(
         onPlayClick = onPlayClick,
         onRewindClick = onRewindClick,
         onFastForwardClick = onFastForwardClick,
+        sleepTimerState = viewState.sleepTimerState,
+        onSleepTimerClick = onSleepTimerClick,
+        onBookmarkClick = onBookmarkClick,
+        onBookmarkLongClick = onBookmarkLongClick,
         loading = viewState.loading,
       )
       Spacer(modifier = Modifier.size(24.dp))
