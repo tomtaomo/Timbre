@@ -1,21 +1,72 @@
 name: Build APK
+
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+
       - uses: ./.github/actions/build_setup
-      - name: Build debug APK
-        run: ./gradlew :app:assembleFreeDebug -Pvoice.versionName=3.6.3 -Pvoice.versionCode=637 -Pvoice.applicationId=app.timbre.audiobook.mod
-      - uses: actions/upload-artifact@v6
+
+      - name: Prepare signing key
+        run: |
+          set -e
+          mkdir -p signing
+          if [ -f signing/signing.b64 ]; then
+            base64 -d signing/signing.b64 > signing/signing.keystore
+            echo "使用仓库里已有的签名钥匙"
+          else
+            keytool -genkeypair -keystore signing/signing.keystore -storetype PKCS12 \
+              -alias timbre -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass timbremod2026 -keypass timbremod2026 -dname "CN=Timbre Mod"
+            base64 -w0 signing/signing.keystore > signing/signing.b64
+            echo "CREATED_KEY=true" >> "$GITHUB_ENV"
+            echo "已生成新的签名钥匙"
+          fi
+          printf 'STORE_PASSWORD=timbremod2026\nKEY_ALIAS=timbre\nKEY_PASSWORD=timbremod2026\n' > signing/signing.properties
+
+      - name: Save signing key to repo
+        if: env.CREATED_KEY == 'true'
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f signing/signing.b64
+          git commit -m "chore: 保存签名钥匙 [skip ci]"
+          git push
+
+      - name: Assemble signed release APK
+        run: ./gradlew :app:assembleFreeRelease -Pvoice.versionName=3.6.3 -Pvoice.versionCode=637 -Pvoice.applicationId=app.timbre.audiobook.mod
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/free/release/*.apk out/
+          ls -lh out
+          for f in out/*.apk; do
+            case "$f" in
+              *unsigned*)
+                echo "::error::出来的是未签名包，说明 signing.properties 没被读到"
+                exit 1
+                ;;
+            esac
+          done
+
+      - uses: actions/upload-artifact@v7
         with:
-          name: timbre-apk
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+          name: timbre-release-apk
+          path: out/*.apk
+          if-no-files-found: warn
