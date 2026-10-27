@@ -444,7 +444,7 @@ public class OnlineBookCacheManager(
           if (consecutiveFailures >= ABORT_AFTER_CONSECUTIVE_FAILURES) break
           continue
         }
-        val downloaded = downloadSlots.withPermit { downloadToCache(ref, stream.url) }
+        val downloaded = downloadSlots.withPermit { downloadToCache(ref, stream) }
         if (downloaded) {
           done++
           consecutiveFailures = 0
@@ -581,11 +581,11 @@ public class OnlineBookCacheManager(
   /** Downloads [url] into the file cache; false when it could not be stored. */
   private suspend fun downloadToCache(
     ref: OnlineChapterRef,
-    url: String,
+    stream: ResolvedStream,
   ): Boolean = withContext(Dispatchers.IO) {
     try {
-      val requestUrl = OnlineStreamUrlPolicy.applyCertFallback(url)
-      download(requestUrl).use { response ->
+      val requestUrl = OnlineStreamUrlPolicy.applyCertFallback(stream.url)
+      download(requestUrl, stream.headers).use { response ->
         if (!response.isSuccessful) return@withContext false
         val tmp = fileCache.tmpFileFor(ref)
         tmp.parentFile?.mkdirs()
@@ -619,16 +619,19 @@ public class OnlineBookCacheManager(
    * unusable the same way streaming does: after a failed https handshake the
    * address is retried over plain http.
    */
-  private suspend fun download(url: String): Response {
+  private suspend fun download(
+    url: String,
+    headers: Map<String, String>,
+  ): Response {
     return try {
-      executeCancellable(downloadRequest(url))
+      executeCancellable(downloadRequest(url, headers))
     } catch (e: IOException) {
       coroutineContext.ensureActive()
       val httpUrl = OnlineStreamUrlPolicy.downgradeToHttp(url)
       if (httpUrl == null || !isCertificateProblem(e)) throw e
       Logger.w("TLS handshake failed for source host, retrying over http: ${e.message}")
       OnlineStreamUrlPolicy.rememberCertBroken(url)
-      executeCancellable(downloadRequest(httpUrl))
+      executeCancellable(downloadRequest(httpUrl, headers))
     }
   }
 
@@ -654,7 +657,10 @@ public class OnlineBookCacheManager(
     }
   }
 
-  private suspend fun downloadRequest(url: String): Request {
+  private suspend fun downloadRequest(
+    url: String,
+    headers: Map<String, String>,
+  ): Request {
     val builder = Request.Builder().url(url)
     // urls served by the configured server require the bearer token; third
     // party cdn links must not receive it
@@ -663,6 +669,11 @@ public class OnlineBookCacheManager(
     if (token.isNotEmpty() && base.isNotEmpty() && url.startsWith(base)) {
       builder.header("Authorization", "Bearer $token")
     }
+    // headers the source script asked for (Referer / UA / Cookie): the player sends them, the cache must too
+    for ((name, value) in headers) {
+      builder.header(name, value)
+    }
+    builder.header("Range", "bytes=0-")
     return builder.build()
   }
 
