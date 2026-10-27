@@ -2,11 +2,9 @@ name: Build APK (cache fix)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: cachefix-${{ github.ref }}
@@ -21,8 +19,7 @@ jobs:
 
       - uses: ./.github/actions/build_setup
 
-      # 打包前自动修改缓存下载逻辑（只改工作区，不提交回仓库）：
-      # 缓存请求带上源脚本要求的请求头（Referer / UA / Cookie），并和播放器一样带 Range
+      # 1) 修改缓存下载逻辑：带上源脚本要求的请求头 + Range（和播放器一致）
       - name: Patch the cache downloader
         run: |
           python3 - <<'PY'
@@ -150,6 +147,20 @@ jobs:
           print("cache downloader patched")
           PY
 
+      # 2) 把改好的文件提交回仓库，从此固化，不再依赖每次构建现打补丁
+      - name: Commit the patched file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f core/online/src/main/kotlin/voice/core/online/OnlineBookCacheManager.kt
+          if git diff --cached --quiet; then
+            echo "文件已是修补后的状态，无需提交"
+          else
+            git commit -m "fix: 在线书缓存下载带上源请求头与 Range [skip ci]"
+            git push
+            echo "已提交回仓库"
+          fi
+
       - name: Prepare signing key
         run: |
           set -e
@@ -167,7 +178,7 @@ jobs:
           printf 'STORE_PASSWORD=timbremod2026\nKEY_ALIAS=timbre\nKEY_PASSWORD=timbremod2026\n' > signing/signing.properties
 
       - name: Assemble signed release APK
-        run: ./gradlew :app:assembleFreeRelease -Pvoice.versionName=3.6.3 -Pvoice.versionCode=637 -Pvoice.applicationId=app.timbre.audiobook.mod
+        run: ./gradlew :app:assembleFreeRelease -Pvoice.versionName=3.6.3 -Pvoice.versionCode=638 -Pvoice.applicationId=app.timbre.audiobook.mod
 
       - name: Collect APK
         run: |
